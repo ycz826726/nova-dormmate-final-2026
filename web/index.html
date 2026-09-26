@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DormMate · 宿舍环境监测</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="card">
+    <h1 class="title">DormMate</h1>
+    <p class="subtitle">宿舍环境监测</p>
+
+    <div class="field">
+      <label for="temperature">温度（℃）</label>
+      <input id="temperature" type="text" inputmode="decimal" placeholder="例如 25" />
+    </div>
+
+    <div class="field">
+      <label for="humidity">湿度（%）</label>
+      <input id="humidity" type="text" inputmode="decimal" placeholder="例如 60" />
+    </div>
+
+    <button id="analyzeBtn" type="button">分析环境</button>
+
+    <p id="message" class="message" role="alert"></p>
+
+    <section id="result" class="result" hidden>
+      <div class="result-grid">
+        <div class="result-col">
+          <h2 class="result-title">当前状态</h2>
+          <p class="status" id="statusText"></p>
+        </div>
+        <div class="result-col">
+          <h2 class="result-title">建议</h2>
+          <p class="advice" id="adviceText"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="history">
+      <h2 class="history-title">历史记录</h2>
+      <ul id="historyList" class="history-list"></ul>
+      <p id="historyEmpty" class="history-empty">暂无历史记录</p>
+    </section>
+
+    <button id="exportBtn" type="button">导出CSV</button>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>

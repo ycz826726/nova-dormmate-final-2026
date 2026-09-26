@@ -1,0 +1,191 @@
+/* NOVA DormMate C01 · M1 样式 */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", sans-serif;
+  background: #eef2f7;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 24px;
+}
+
+/* 卡片：自定义圆角 + 阴影（核验点 1） */
+.card {
+  width: 100%;
+  max-width: 1200px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  padding: 28px;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 4px 0 20px;
+}
+
+.field {
+  margin-bottom: 14px;
+}
+
+.field label {
+  display: block;
+  font-size: 13px;
+  color: #4b5563;
+  margin-bottom: 6px;
+}
+
+.field input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.field input:focus {
+  border-color: #4f7cff;
+}
+
+/* 主按钮：自定义配色 + 悬停加深 + 圆角（核验点 2） */
+button#analyzeBtn {
+  width: 100%;
+  margin-top: 6px;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  background: #4f7cff;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+button#analyzeBtn:hover {
+  background: #3a63e0;
+}
+
+/* 次要按钮：导出CSV（白底描边 + 蓝色文字，与主按钮区分） */
+button#exportBtn {
+  width: 100%;
+  margin-top: 20px;
+  padding: 12px;
+  border: 1px solid #4f7cff;
+  border-radius: 8px;
+  background: #fff;
+  color: #4f7cff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+button#exportBtn:hover {
+  background: #f5f8ff;
+}
+
+.message {
+  min-height: 20px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: #dc2626;
+}
+
+.result {
+  margin-top: 16px;
+  padding: 16px;
+  background: #f5f8ff;
+  border-radius: 12px;
+}
+
+.result-grid {
+  display: flex;
+  gap: 24px;
+}
+
+.result-col {
+  flex: 1;
+  min-width: 0;
+}
+
+.result-col + .result-col {
+  border-left: 1px solid #e5e7eb;
+  padding-left: 24px;
+}
+
+.result-title,
+.history-title {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+
+.status,
+.advice {
+  font-size: 15px;
+  line-height: 1.5;
+  min-height: 1.5em;
+}
+
+.status {
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.advice {
+  color: #4f7cff;
+}
+
+.history {
+  margin-top: 20px;
+}
+
+.history-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #f9fafb;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #374151;
+}
+
+.history-list .time {
+  color: #9ca3af;
+  flex: 1;
+}
+
+.history-list .metrics {
+  flex-shrink: 0;
+}
+
+.history-empty {
+  font-size: 13px;
+  color: #9ca3af;
+}
