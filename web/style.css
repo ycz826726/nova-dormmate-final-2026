@@ -101,14 +101,15 @@ button#exportBtn:hover {
   background: #f5f8ff;
 }
 
-/* ===== M3 · 摄像头 ===== */
+/* ===== M3 · 摄像头 / 语音 ===== */
 .section-title {
   font-size: 14px;
   color: #6b7280;
   margin-bottom: 8px;
 }
 
-.camera {
+.camera,
+.voice {
   margin-top: 20px;
   padding-top: 20px;
   border-top: 1px solid #e5e7eb;
@@ -172,6 +173,18 @@ img#photo {
   width: 100%;
   border-radius: 8px;
   display: block;
+}
+
+.asr-text {
+  min-height: 48px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #f9fafb;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #374151;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .media-message {

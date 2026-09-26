@@ -160,20 +160,25 @@ function onExport() {
 
 exportBtn.addEventListener("click", onExport);
 
-// ==================== M3 · 摄像头 ====================
+// ==================== M3 · 摄像头 / ASR / TTS ====================
 
-// 摄像头 DOM 元素
+// M3 DOM 元素
 const startCamBtn = document.getElementById("startCamBtn");
 const captureBtn = document.getElementById("captureBtn");
 const stopCamBtn = document.getElementById("stopCamBtn");
 const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
 const photo = document.getElementById("photo");
+const startAsrBtn = document.getElementById("startAsrBtn");
+const stopAsrBtn = document.getElementById("stopAsrBtn");
+const asrText = document.getElementById("asrText");
 const mediaMessage = document.getElementById("mediaMessage");
 const camPlaceholder = document.getElementById("camPlaceholder");
 
-// 摄像头状态
+// M3 状态
 let mediaStream = null; // 摄像头媒体流
+let recognition = null; // ASR 实例
+let commandTriggered = false; // 防「朗读状态」连续重复触发
 
 // 媒体错误提示（独立于 M1 的 #message，避免互相覆盖）
 function showMediaError(text) {
@@ -182,6 +187,12 @@ function showMediaError(text) {
 
 function clearMediaError() {
   mediaMessage.textContent = "";
+}
+
+// 取当前状态文本供 TTS：M1 的 statusText 为空时补 "--"
+function getCurrentStatusText() {
+  const text = statusText.textContent.trim();
+  return text ? text : "--";
 }
 
 // —— 摄像头 ——
@@ -233,7 +244,81 @@ function stopCamera() {
   camPlaceholder.classList.remove("is-hidden");
 }
 
-// 绑定摄像头事件
+// —— ASR ——
+function initRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    showMediaError("当前浏览器不支持语音识别（建议使用 Chrome/Edge）");
+    return null;
+  }
+  const rec = new SR();
+  rec.lang = "zh-CN";
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.onresult = handleAsrResult;
+  rec.onerror = handleAsrError;
+  return rec;
+}
+
+function handleAsrResult(event) {
+  let transcript = "";
+  for (let i = 0; i < event.results.length; i++) {
+    transcript += event.results[i][0].transcript;
+  }
+  asrText.textContent = transcript;
+
+  if (!commandTriggered && transcript.includes("朗读当前状态")) {
+    commandTriggered = true;
+    speakCurrentStatus();
+  }
+}
+
+function handleAsrError(event) {
+  if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+    showMediaError("麦克风权限被拒绝");
+  } else {
+    showMediaError("语音识别出错：" + event.error);
+  }
+}
+
+function startAsr() {
+  clearMediaError();
+  if (!recognition) {
+    recognition = initRecognition();
+    if (!recognition) return;
+  }
+  commandTriggered = false;
+  try {
+    recognition.start();
+  } catch (err) {
+    showMediaError("无法开始语音识别");
+  }
+}
+
+function stopAsr() {
+  if (recognition) {
+    try {
+      recognition.stop();
+    } catch (err) {
+      // 未在识别中时 stop 会抛错，忽略即可
+    }
+  }
+}
+
+// —— TTS ——
+function speakCurrentStatus() {
+  if (!("speechSynthesis" in window)) {
+    showMediaError("当前浏览器不支持语音合成");
+    return;
+  }
+  const utterance = new SpeechSynthesisUtterance("当前状态：" + getCurrentStatusText());
+  utterance.lang = "zh-CN";
+  window.speechSynthesis.speak(utterance);
+}
+
+// 绑定事件
 startCamBtn.addEventListener("click", startCamera);
 captureBtn.addEventListener("click", capturePhoto);
 stopCamBtn.addEventListener("click", stopCamera);
+startAsrBtn.addEventListener("click", startAsr);
+stopAsrBtn.addEventListener("click", stopAsr);
