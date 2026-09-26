@@ -45,6 +45,24 @@
     </section>
 
     <button id="exportBtn" type="button">导出CSV</button>
+
+    <!-- M3 摄像头区域 -->
+    <section class="camera">
+      <h2 class="section-title">摄像头</h2>
+      <div class="media-actions">
+        <button id="startCamBtn" type="button">开启摄像头</button>
+        <button id="captureBtn" type="button">拍照</button>
+        <button id="stopCamBtn" type="button">关闭摄像头</button>
+      </div>
+      <div class="cam-view">
+        <video id="video" class="is-hidden" autoplay playsinline muted></video>
+        <div id="camPlaceholder" class="cam-placeholder">未开启摄像头</div>
+      </div>
+      <canvas id="canvas" hidden></canvas>
+      <div class="photo-preview"><img id="photo" class="is-hidden" alt="照片预览" /></div>
+    </section>
+
+    <p id="mediaMessage" class="media-message" role="alert"></p>
   </main>
 
   <script src="script.js"></script>

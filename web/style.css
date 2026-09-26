@@ -101,6 +101,90 @@ button#exportBtn:hover {
   background: #f5f8ff;
 }
 
+/* ===== M3 · 摄像头 ===== */
+.section-title {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+
+.camera {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.media-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.media-actions button {
+  flex: 1;
+  padding: 9px 0;
+  border: 1px solid #4f7cff;
+  border-radius: 8px;
+  background: #fff;
+  color: #4f7cff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.media-actions button:hover {
+  background: #f5f8ff;
+}
+
+.cam-view {
+  position: relative;
+  width: 100%;
+  min-height: 200px;
+  border-radius: 8px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+}
+
+video#video {
+  width: 100%;
+  min-height: 200px;
+  display: block;
+  object-fit: cover;
+}
+
+.cam-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+.photo-preview {
+  margin-top: 12px;
+}
+
+img#photo {
+  width: 100%;
+  border-radius: 8px;
+  display: block;
+}
+
+.media-message {
+  min-height: 20px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: #dc2626;
+}
+
+.is-hidden {
+  display: none !important;
+}
+
 .message {
   min-height: 20px;
   margin-top: 12px;

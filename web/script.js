@@ -159,3 +159,81 @@ function onExport() {
 }
 
 exportBtn.addEventListener("click", onExport);
+
+// ==================== M3 · 摄像头 ====================
+
+// 摄像头 DOM 元素
+const startCamBtn = document.getElementById("startCamBtn");
+const captureBtn = document.getElementById("captureBtn");
+const stopCamBtn = document.getElementById("stopCamBtn");
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const photo = document.getElementById("photo");
+const mediaMessage = document.getElementById("mediaMessage");
+const camPlaceholder = document.getElementById("camPlaceholder");
+
+// 摄像头状态
+let mediaStream = null; // 摄像头媒体流
+
+// 媒体错误提示（独立于 M1 的 #message，避免互相覆盖）
+function showMediaError(text) {
+  mediaMessage.textContent = text;
+}
+
+function clearMediaError() {
+  mediaMessage.textContent = "";
+}
+
+// —— 摄像头 ——
+async function startCamera() {
+  clearMediaError();
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showMediaError("当前环境不支持摄像头，请在 localhost 或 HTTPS 下运行");
+    return;
+  }
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
+    video.srcObject = mediaStream;
+    await video.play();
+    video.classList.remove("is-hidden");
+    camPlaceholder.classList.add("is-hidden");
+  } catch (err) {
+    mediaStream = null;
+    if (err.name === "NotAllowedError" || err.name === "SecurityError") {
+      showMediaError("摄像头权限被拒绝，请在地址栏允许访问摄像头");
+    } else if (err.name === "NotFoundError") {
+      showMediaError("未检测到摄像头设备");
+    } else {
+      showMediaError("无法开启摄像头：" + err.name);
+    }
+  }
+}
+
+function capturePhoto() {
+  if (!mediaStream || !video.videoWidth) {
+    showMediaError("请先开启摄像头");
+    return;
+  }
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  photo.src = canvas.toDataURL("image/png");
+  photo.classList.remove("is-hidden");
+  clearMediaError();
+}
+
+function stopCamera() {
+  if (mediaStream) {
+    mediaStream.getTracks().forEach((track) => track.stop());
+    mediaStream = null;
+  }
+  video.srcObject = null;
+  video.classList.add("is-hidden");
+  camPlaceholder.classList.remove("is-hidden");
+}
+
+// 绑定摄像头事件
+startCamBtn.addEventListener("click", startCamera);
+captureBtn.addEventListener("click", capturePhoto);
+stopCamBtn.addEventListener("click", stopCamera);
