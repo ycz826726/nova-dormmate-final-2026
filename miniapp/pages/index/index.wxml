@@ -1,0 +1,61 @@
+<view class="card">
+  <view class="title">DormMate</view>
+  <view class="subtitle">宿舍环境监测</view>
+
+  <view class="field">
+    <text>温度（℃）</text>
+    <input placeholder="例如 25" value="{{temperature}}" bindinput="onTempInput" />
+  </view>
+
+  <view class="field">
+    <text>湿度（%）</text>
+    <input placeholder="例如 60" value="{{humidity}}" bindinput="onHumInput" />
+  </view>
+
+  <button class="analyze-btn" bindtap="onAnalyze">分析环境</button>
+  <view class="message">{{message}}</view>
+
+  <view wx:if="{{status}}" class="result">
+    <view class="result-grid">
+      <view class="result-col">
+        <view class="result-title">当前状态</view>
+        <view class="status">{{status}}</view>
+      </view>
+      <view class="result-col">
+        <view class="result-title">建议</view>
+        <view class="advice">{{advice}}</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="history">
+    <view class="history-header">
+      <view class="history-title">历史记录</view>
+      <!-- 新增清空历史按钮 -->
+      <button class="clear-his-btn" bindtap="clearAllHistory">清空记录</button>
+    </view>
+
+    <view wx:if="{{historyList.length === 0}}" class="history-empty">
+      暂无历史记录，完成有效分析后自动生成
+    </view>
+
+    <view wx:else class="history-table">
+      <view class="history-row history-header-row">
+        <text class="history-cell time-cell">时间</text>
+        <text class="history-cell temp-cell">温度</text>
+        <text class="history-cell hum-cell">湿度</text>
+        <text class="history-cell status-cell">状态</text>
+      </view>
+      <view
+        wx:for="{{historyList}}"
+        wx:key="index"
+        class="history-row"
+      >
+        <text class="history-cell time-cell">{{item.time}}</text>
+        <text class="history-cell temp-cell">{{item.temp}}℃</text>
+        <text class="history-cell hum-cell">{{item.hum}}%</text>
+        <text class="history-cell status-cell status-{{item.status}}">{{item.status}}</text>
+      </view>
+    </view>
+  </view>
+</view>

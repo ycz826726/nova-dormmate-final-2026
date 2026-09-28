@@ -1,0 +1,188 @@
+page {
+  background: #eef2f7;
+  padding: 48rpx;
+  box-sizing: border-box;
+}
+ page,view,text,button,image{
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+/* 外层卡片容器 */
+.card {
+  width: 100%;
+  background: #fff;
+  border-radius: 24rpx;
+  padding: 56rpx;
+}
+.title {
+  font-size: 44rpx;
+  font-weight: 700;
+  color: #1f2937;
+}
+.subtitle {
+  font-size: 28rpx;
+  color: #6b7280;
+  margin: 8rpx 0 40rpx;
+}
+/* 输入框区域 */
+.field {
+  margin-bottom: 28rpx;
+}
+.field text {
+  display: block;
+  font-size: 26rpx;
+  color: #4b5563;
+  margin-bottom: 12rpx;
+}
+.field input {
+  width: 100%;
+  padding: 20rpx 24rpx;
+  border: 1rpx solid #d1d5db;
+  border-radius: 16rpx;
+  font-size: 30rpx;
+}
+/* 分析主按钮 */
+.analyze-btn {
+  width: 100%;
+  margin-top: 12rpx;
+  padding: 24rpx;
+  border: none;
+  border-radius: 16rpx;
+  background: #4f7cff;
+  color: #fff;
+  font-size: 32rpx;
+  font-weight: 600;
+}
+/* 错误提示文字 */
+.message {
+  min-height: 40rpx;
+  margin-top: 24rpx;
+  font-size: 26rpx;
+  color: #dc2626;
+}
+/* 分析结果区域 */
+.result {
+  margin-top: 32rpx;
+  padding: 32rpx;
+  background: #f5f8ff;
+  border-radius: 24rpx;
+}
+.result-grid {
+  display: flex;
+  gap: 48rpx;
+}
+.result-col {
+  flex: 1;
+  min-width: 0;
+}
+.result-col:nth-child(2) {
+  border-left: 1rpx solid #e5e7eb;
+  padding-left: 48rpx;
+}
+.result-title {
+  font-size: 28rpx;
+  color: #6b7280;
+  margin-bottom: 16rpx;
+}
+.status {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #1f2937;
+  line-height: 1.5;
+}
+.advice {
+  font-size: 30rpx;
+  color: #4f7cff;
+  line-height: 1.5;
+}
+
+/* ====================== 表格样式历史记录 ====================== */
+.history {
+  margin-top: 40rpx;
+}
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+.history-title {
+  font-size: 28rpx;
+  color: #6b7280;
+}
+.more-btn {
+  font-size: 24rpx;
+  padding: 6rpx 16rpx;
+  border: 1rpx solid #4f7cff;
+  color: #4f7cff;
+  background: #fff;
+  border-radius: 12rpx;
+  margin: 0;
+}
+.history-empty {
+  font-size: 26rpx;
+  color: #9ca3af;
+  padding: 20rpx 0;
+}
+/* 表格外框 */
+.history-table {
+  background: #ffffff;
+  border: 1rpx solid #e5e7eb;
+  border-radius: 16rpx;
+  overflow: hidden;
+}
+/* 表格单行 */
+.history-row {
+  display: flex;
+  align-items: center;
+  padding: 24rpx 20rpx;
+  border-bottom: 1rpx solid #f1f3f5;
+}
+/* 表头特殊样式 */
+.history-header-row {
+  background: #f9fafb;
+  font-weight: 700;
+  color: #374151;
+}
+/* 四列单元格比例 */
+.history-cell {
+  font-size: 26rpx;
+  color: #374151;
+}
+.time-cell {
+  flex: 2;
+  text-align: left;
+  color: #6b7280;
+}
+.temp-cell, .hum-cell {
+  flex: 1;
+  text-align: center;
+}
+.status-cell {
+  flex: 1;
+  text-align: right;
+  font-weight: 700;
+}
+/* 不同状态文字配色，对标第二张图红色异常 */
+.status-normal {
+  color: #16a34a;
+}
+.status-cold {
+  color: #2563eb;
+}
+.status-hot {
+  color: #dc2626;
+}
+.status-warn {
+  color: #ca8a04;
+}
+.clear-his-btn {
+  font-size: 24rpx;
+  padding: 6rpx 16rpx;
+  border: 1rpx solid #dc2626;
+  color: #dc2626;
+  background: #fff;
+  border-radius: 12rpx;
+  margin: 0;
+}
