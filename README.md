@@ -4,7 +4,7 @@ NOVA C01 DormMate Final Challenge
 
 ## 项目简介
 本项目为NOVA低年级综合挑战C01的DormMate‑Final项目，实现宿舍环境监测Web系统。
-整体开发顺序：M1 → M2 → M3，严格遵循任务书统一环境判断规则，使用原生HTML/CSS/JavaScript、Python，浏览器原生媒体API，不引入大型第三方框架。
+整体开发顺序：M1 → M2 → M3 → M4 → M5，严格遵循任务书统一环境判断规则，使用原生HTML/CSS/JavaScript、Python，浏览器原生媒体API，不引入大型第三方框架。
 
 > 统一环境判断规则（全模块共用）
 > 1. temperature < 18 → 偏冷
@@ -12,7 +12,7 @@ NOVA C01 DormMate Final Challenge
 > 3. 否则 humidity ≥75 → 偏湿（前提：18 ≤ temperature <30）
 > 4. 其余情况 → 正常
 
-## ✨ 模块开发过程 M1‑M3
+## ✨ 模块开发过程 M1‑M5
 ### M1｜Web主应用：输入、校验、判断、历史记录
 目标：搭建整个系统Web基础入口。
 产出文件：`web/index.html`、`web/style.css`、`web/script.js`
@@ -74,6 +74,35 @@ M3验收完成点：
 - Camera快照、ASR识别、TTS朗读可现场运行；固定语音指令可以真实触发功能。
 - 本地git log可查看提交历史，GitHub仓库可见全部提交记录；README文档完善。
 
+### M4｜微信小程序版宿舍监测
+目标：将 M1 的环境监测能力迁移到微信小程序端。
+产出文件：`miniapp/`（app.js、app.json、app.wxss、pages/index/ 等）
+
+实现过程：
+1. 小程序 index 页面复用 M1 的输入校验与 `getStatus` 环境判定规则，实现温湿度输入、非法拦截、状态与建议展示。
+2. 历史记录以表格形式展示（时间 / 温度 / 湿度 / 状态），状态列带颜色标识。
+3. 使用 `wx.setStorageSync` 将历史持久化到本地缓存，关闭小程序后记录不丢失（区别于 M1 纯内存存储）。
+4. 提供【清空记录】按钮，带二次确认弹窗，一键清空全部历史。
+
+M4验收完成点：
+- 小程序可正常输入、判定、展示历史；历史记录本地缓存持久化，重启小程序不丢失。
+
+### M5｜MQTT 实时监控面板
+目标：通过 MQTT Broker 实现宿舍环境数据的实时上报与网页监控。
+产出文件：`mosquitto.conf`、`mqtt-m5/`（index.html、style.css、app.js）
+
+实现过程：
+1. 配置 Mosquitto Broker，同时开启 TCP 1883（MQTTX 接入）与 WebSocket 9001（浏览器 mqtt.js 接入），允许匿名访问。
+2. 使用 mqtt.js 通过 `ws://127.0.0.1:9001` 连接 Broker，订阅主题 `dormmate/+/env`。
+3. 三个宿舍节点 dorm-a / dorm-b / dorm-c 各自独立卡片，实时展示温度、湿度、状态。
+4. `status` 由前端根据温湿度复用 M1 规则计算，不使用 MQTT 消息中的 status 字段。
+5. 使用 Chart.js 绘制温湿度双折线图，下拉框切换查看不同节点趋势。
+6. 全局历史记录列表，每条消息逐条追加、不删除旧记录。
+7. 断线自动重连；非法 JSON、错误 topic 捕获异常、页面不崩溃。
+
+M5验收完成点：
+- MQTTX 发布消息，网页无需刷新实时更新卡片、图表与历史记录。
+
 ## 🛠️ 运行方法
 1. **Web(M1/M3)运行**
     使用VS Code插件Live Server，以localhost打开 `web/index.html`，浏览器授权摄像头、麦克风权限。
@@ -84,8 +113,9 @@ M3验收完成点：
     3. 安装依赖：
     ```bash
     pip install matplotlib
+    ```
 
-   ## ✨ 一、主要功能
+## ✨ 一、主要功能
 1. **M1 环境输入与状态判断**
    - 温湿度输入框，对输入做合法性校验，拦截空值、非数字、越界数值。
    - 根据温湿度自动判定宿舍环境状态，给出文字建议。
@@ -102,6 +132,16 @@ M3验收完成点：
    - 固定语音指令触发功能，示例指令：`朗读当前状态`。
    - TTS动态语音合成，朗读环境结果，实现语音交互闭环。
 
+4. **M4 微信小程序宿舍监测**
+   - 小程序端温湿度输入、校验、环境状态判定与建议。
+   - 历史记录表格展示，状态带颜色标识。
+   - 本地缓存持久化历史，重启小程序不丢失。
+
+5. **M5 MQTT 实时监控面板**
+   - Mosquitto Broker + mqtt.js 实时收发宿舍环境数据。
+   - 三个节点卡片实时展示温度、湿度、前端计算的状态。
+   - Chart.js 温湿度趋势图 + 全局历史记录。
+
 ## 🛠️ 二、运行方式
 ### 1. Web前端（M1、M3页面）
 1. 使用VS Code的Live Server插件，**以localhost协议打开 `web/index.html`**。
@@ -117,6 +157,19 @@ M3验收完成点：
 ```bash
 pip install matplotlib
 python analysis.py
+```
+
+### 3. 微信小程序（M4模块）
+1. 使用微信开发者工具导入 `miniapp/` 目录。
+2. 编译运行，输入温湿度、点击分析，查看状态、建议与历史记录。
+
+### 4. MQTT 实时监控（M5模块）
+1. 启动 Broker（需监听 1883 TCP + 9001 WebSocket）：
+```bash
+mosquitto -c mosquitto.conf -v
+```
+2. 用 Live Server 打开 `mqtt-m5/index.html`，页面连接 `ws://127.0.0.1:9001`。
+3. 用 MQTTX 连接 `mqtt://127.0.0.1:1883`，向 `dormmate/<nodeId>/env` 发布 JSON 消息，网页实时更新。
 
 ⚠️ 三、已知限制
 1:浏览器媒体 API（摄像头、麦克风、ASR）仅支持localhost，本地直接打开 html 文件无法调用硬件。
