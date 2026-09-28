@@ -120,6 +120,7 @@ const chart = new Chart(ctx, {
         data: [],
         borderColor: "#16a34a",
         backgroundColor: "rgba(22, 163, 74, 0.1)",
+        borderDash: [6, 4],
         yAxisID: "y1",
         tension: 0.3,
         pointRadius: 3,
@@ -134,11 +135,15 @@ const chart = new Chart(ctx, {
       y: {
         type: "linear",
         position: "left",
+        min: 0,
+        max: 100,
         title: { display: true, text: "温度 (℃)" },
       },
       y1: {
         type: "linear",
         position: "right",
+        min: 0,
+        max: 100,
         title: { display: true, text: "湿度 (%)" },
         grid: { drawOnChartArea: false },
       },
