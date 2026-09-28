@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DormMate M6 · 3D宿舍实时状态模拟</title>
+
+  <!-- Three.js：浏览器全局 THREE -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <!-- mqtt.js：浏览器全局 mqtt -->
+  <script src="https://cdn.jsdelivr.net/npm/mqtt@4.3.7/dist/mqtt.min.js"></script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Microsoft YaHei", sans-serif;
+      background: #eef2f7;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .card {
+      width: 100%;
+      max-width: 900px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+      padding: 28px;
+    }
+    .title { font-size: 22px; font-weight: 700; color: #1f2937; }
+    .subtitle { font-size: 14px; color: #6b7280; margin: 4px 0 20px; }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      margin-bottom: 20px;
+      font-size: 14px;
+      color: #374151;
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: #9ca3af; flex-shrink: 0; }
+    .dot.connected    { background: #16a34a; }
+    .dot.reconnecting { background: #d97706; }
+    .dot.disconnected,
+    .dot.error        { background: #dc2626; }
+    .notice { margin-left: auto; font-size: 13px; color: #dc2626; }
+
+    .cur-status {
+      margin-bottom: 14px;
+      font-size: 14px;
+      color: #374151;
+    }
+    #curStatusText { font-weight: 700; }
+    .status-normal { color: #16a34a; }
+    .status-hot    { color: #f59e0b; }
+    .status-wet    { color: #2563eb; }
+    .status-cold   { color: #06b6d4; }
+
+    #dorm3d {
+      width: 100%;
+      height: 520px;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1 class="title">DormMate M6 · 3D宿舍实时状态模拟</h1>
+    <p class="subtitle">ws://127.0.0.1:9001 · 订阅 dormmate/+/env</p>
+
+    <!-- 连接状态 -->
+    <div class="status-bar">
+      <span id="statusDot" class="dot"></span>
+      <span id="statusText">未连接</span>
+      <span id="notice" class="notice"></span>
+    </div>
+
+    <!-- 当前状态文字（便于观察 3D 是否随 MQTT 状态变化） -->
+    <p class="cur-status">当前宿舍状态：<span id="curStatusText">--</span></p>
+
+    <!-- 3D 画布容器 -->
+    <div id="dorm3d"></div>
+  </main>
+
+  <script>
+    // ==================== M1 环境状态判定规则（前端计算） ====================
+    function getStatus(temperature, humidity) {
+      if (temperature < 18) return "偏冷";
+      if (temperature >= 30) return "偏热";
+      if (humidity >= 75) return "偏湿";
+      return "正常";
+    }
+
+    function statusClass(status) {
+      switch (status) {
+        case "正常": return "status-normal";
+        case "偏热": return "status-hot";
+        case "偏湿": return "status-wet";
+        case "偏冷": return "status-cold";
+        default: return "status-normal";
+      }
+    }
+
+    const NODE_IDS = ["dorm-a", "dorm-b", "dorm-c"];
+
+    // —— 连接状态 UI ——
+    const statusDot = document.getElementById("statusDot");
+    const statusText = document.getElementById("statusText");
+    const noticeEl = document.getElementById("notice");
+    const curStatusEl = document.getElementById("curStatusText");
+
+    function setStatus(text, type) {
+      statusText.textContent = text;
+      statusDot.className = "dot " + type;
+    }
+    function setNotice(text) { noticeEl.textContent = text; }
+    function clearNotice() { noticeEl.textContent = ""; }
+
+    // ==================== Three.js 场景初始化 ====================
+    const dorm3d = document.getElementById("dorm3d");
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xbfe3ff); // 浅蓝天空
+
+    const camera = new THREE.PerspectiveCamera(
+      45,
+      dorm3d.clientWidth / dorm3d.clientHeight,
+      0.1,
+      100
+    );
+    camera.position.set(4, 3, 7);
+    camera.lookAt(0, 1, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(dorm3d.clientWidth, dorm3d.clientHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    dorm3d.appendChild(renderer.domElement);
+
+    // 灯光（环境光 + 模拟阳光）
+    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(3, 5, 4);
+    scene.add(dirLight);
+
+    // ==================== 童趣场景材质配色代码 ====================
+    // 绿色草地
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(14, 12),
+      new THREE.MeshStandardMaterial({ color: 0x81c784 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    scene.add(ground);
+
+    // 小屋前的小路（浅米色）
+    const path = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.0, 3.0),
+      new THREE.MeshStandardMaterial({ color: 0xe8dcc8 })
+    );
+    path.rotation.x = -Math.PI / 2;
+    path.position.set(0, 0.01, 2.2);
+    scene.add(path);
+
+    // 主体宿舍小屋（青绿墙面 + 棕色门 + 浅色屋顶）
+    const house = new THREE.Group();
+
+    const wall = new THREE.Mesh(
+      new THREE.BoxGeometry(2.2, 1.4, 1.6),
+      new THREE.MeshStandardMaterial({ color: 0x6cc4b0 }) // 青绿墙面
+    );
+    wall.position.y = 0.7;
+    house.add(wall);
+
+    // 屋顶：三棱柱（浅橙）
+    const roofShape = new THREE.Shape();
+    roofShape.moveTo(-1.35, 0);
+    roofShape.lineTo(0, 0.85);
+    roofShape.lineTo(1.35, 0);
+    roofShape.closePath();
+    const roofGeom = new THREE.ExtrudeGeometry(roofShape, { depth: 1.9, bevelEnabled: false });
+    roofGeom.translate(0, 0, -0.95);
+    const roof = new THREE.Mesh(
+      roofGeom,
+      new THREE.MeshStandardMaterial({ color: 0xf6b26b }) // 浅色屋顶
+    );
+    roof.position.y = 1.4;
+    house.add(roof);
+
+    // 门（棕色，贴墙正面）
+    const door = new THREE.Mesh(
+      new THREE.BoxGeometry(0.5, 0.7, 0.06),
+      new THREE.MeshStandardMaterial({ color: 0x8b5a2b })
+    );
+    door.position.set(0, 0.35, 0.81);
+    house.add(door);
+
+    // 可变色窗户（窗框 + 玻璃），贴墙正面门旁；roughness 供偏湿高光切换
+    const windowMat = new THREE.MeshStandardMaterial({
+      color: 0xbfdbfe, // 浅蓝（正常态）
+      transparent: true,
+      opacity: 0.75,
+      side: THREE.DoubleSide,
+      roughness: 0.7,
+    });
+    const winFrameMat = new THREE.MeshStandardMaterial({ color: 0x475569 });
+    const winW = 0.7, winH = 0.6, winT = 0.06;
+    const winGlass = new THREE.Mesh(new THREE.PlaneGeometry(winW, winH), windowMat);
+    winGlass.position.set(-0.6, 0.75, 0.81);
+    const winTop = new THREE.Mesh(new THREE.BoxGeometry(winW, winT, winT), winFrameMat);
+    winTop.position.set(-0.6, 0.75 + winH / 2, 0.81);
+    const winBottom = new THREE.Mesh(new THREE.BoxGeometry(winW, winT, winT), winFrameMat);
+    winBottom.position.set(-0.6, 0.75 - winH / 2, 0.81);
+    const winLeft = new THREE.Mesh(new THREE.BoxGeometry(winT, winH, winT), winFrameMat);
+    winLeft.position.set(-0.6 - winW / 2, 0.75, 0.81);
+    const winRight = new THREE.Mesh(new THREE.BoxGeometry(winT, winH, winT), winFrameMat);
+    winRight.position.set(-0.6 + winW / 2, 0.75, 0.81);
+    house.add(winGlass, winTop, winBottom, winLeft, winRight);
+
+    house.position.set(0, 0, 0);
+    scene.add(house);
+
+    // 烟囱（屋顶一侧，砖红色）
+    const chimney = new THREE.Mesh(
+      new THREE.BoxGeometry(0.3, 0.55, 0.3),
+      new THREE.MeshStandardMaterial({ color: 0xc0392b })
+    );
+    chimney.position.set(0.7, 1.95, 0.1);
+    chimney.rotation.z = -0.12;
+    scene.add(chimney);
+
+    // 小旗帜（旗杆 + 三角旗），屋前左侧；旗面挂在可摆动 pivot 上
+    const flagGroup = new THREE.Group();
+    const flagPole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.03, 0.03, 0.9, 8),
+      new THREE.MeshStandardMaterial({ color: 0x9ca3af })
+    );
+    flagPole.position.y = 0.45;
+    flagGroup.add(flagPole);
+
+    // 旗面 pivot（位于旗杆顶部，绕 Y 轴摆动模拟风吹）
+    const flagPivot = new THREE.Group();
+    flagPivot.position.set(0, 0.88, 0);
+    const flagShape = new THREE.Shape();
+    flagShape.moveTo(0, 0);
+    flagShape.lineTo(0.42, 0.12);
+    flagShape.lineTo(0, 0.24);
+    flagShape.closePath();
+    const flag = new THREE.Mesh(
+      new THREE.ShapeGeometry(flagShape),
+      new THREE.MeshStandardMaterial({ color: 0xef4444, side: THREE.DoubleSide })
+    );
+    flag.position.set(0, -0.12, 0);
+    flagPivot.add(flag);
+    flagGroup.add(flagPivot);
+    flagGroup.position.set(-1.4, 0, 1.5);
+    scene.add(flagGroup);
+
+    // 花坛（两个花盆 + 花冠 + 小草），屋前两侧；小草偏热蔫掉、偏湿挂水珠
+    const allGrass = [];       // 收集所有草叶 pivot 引用，供动画控制倾斜
+    const grassDroplets = [];  // 收集草叶顶部水珠，偏湿显示
+    function makeFlowerPot(x, z) {
+      const pot = new THREE.Group();
+      const potBody = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.18, 0.14, 0.22, 16),
+        new THREE.MeshStandardMaterial({ color: 0xb5651d }) // 棕色花盆
+      );
+      potBody.position.y = 0.11;
+      pot.add(potBody);
+      const flowerHead = new THREE.Mesh(
+        new THREE.SphereGeometry(0.1, 12, 12),
+        new THREE.MeshStandardMaterial({ color: 0xf472b6 }) // 粉色花冠
+      );
+      flowerHead.position.y = 0.3;
+      pot.add(flowerHead);
+      // 3 根绿色小草，各自挂在 pivot 上，可倾斜（蔫掉）；顶部挂水珠
+      for (let i = 0; i < 3; i++) {
+        const pivot = new THREE.Group();
+        pivot.position.set((i - 1) * 0.06, 0.2, 0);
+        const blade = new THREE.Mesh(
+          new THREE.BoxGeometry(0.03, 0.22, 0.03),
+          new THREE.MeshStandardMaterial({ color: 0x4ade80 }) // 绿色小草
+        );
+        blade.position.y = 0.11;
+        pivot.add(blade);
+        const droplet = new THREE.Mesh(
+          new THREE.SphereGeometry(0.025, 8, 8),
+          new THREE.MeshStandardMaterial({ color: 0xbfdbfe, transparent: true, opacity: 0.6 })
+        );
+        droplet.position.y = 0.24; // 草叶顶部
+        droplet.visible = false;
+        pivot.add(droplet);
+        grassDroplets.push(droplet);
+        pot.add(pivot);
+        allGrass.push({ pivot: pivot, angle: (i - 1) * 1.1 });
+      }
+      pot.position.set(x, 0, z);
+      return pot;
+    }
+    scene.add(makeFlowerPot(-1.5, 1.3));
+    scene.add(makeFlowerPot(1.5, 1.3));
+
+    // ==================== 风扇重构代码（标准细长弧形三叶） ====================
+    const fanObj = new THREE.Group();
+    const fanBodyMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8 });
+    const fanBladeMat = new THREE.MeshStandardMaterial({ color: 0x4fc3f7, side: THREE.DoubleSide });
+
+    // 单片细长弧形扇叶（Shape 平面）
+    function createFanBlade() {
+      const s = new THREE.Shape();
+      s.moveTo(0, 0);
+      s.quadraticCurveTo(0.30, 0.04, 0.26, 0.30);
+      s.quadraticCurveTo(0.22, 0.50, 0.03, 0.54);
+      s.quadraticCurveTo(-0.20, 0.46, -0.18, 0.16);
+      s.quadraticCurveTo(-0.16, 0.03, 0, 0);
+      return new THREE.ShapeGeometry(s);
+    }
+
+    const fanPole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.4, 16), fanBodyMat);
+    fanPole.position.y = 0.2;
+    fanObj.add(fanPole);
+
+    const fanHead = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.16, 24), fanBodyMat);
+    fanHead.rotation.x = Math.PI / 2;
+    fanHead.position.y = 0.4;
+    fanObj.add(fanHead);
+
+    // 扇叶整体（独立 Group，绕 Z 轴旋转时三片同步转动）
+    const fanBlades = new THREE.Group();
+    fanBlades.position.set(0, 0.4, 0.1);
+    for (let i = 0; i < 3; i++) {
+      const blade = new THREE.Mesh(createFanBlade(), fanBladeMat);
+      blade.rotation.z = (i * Math.PI * 2) / 3; // 均匀 120° 环绕中心转轴
+      fanBlades.add(blade);
+    }
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.05, 20), fanBodyMat);
+    hub.rotation.x = Math.PI / 2;
+    fanBlades.add(hub);
+    fanObj.add(fanBlades);
+
+    fanObj.position.set(0, 2.25, 0); // 立在屋脊上
+    scene.add(fanObj);
+
+    // ==================== 材质纹理定义 ====================
+    // 径向渐变光晕纹理（偏热）
+    function createGlowTexture() {
+      const c = document.createElement("canvas");
+      c.width = c.height = 128;
+      const ctx = c.getContext("2d");
+      const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+      g.addColorStop(0, "rgba(255, 240, 160, 0.75)");
+      g.addColorStop(1, "rgba(255, 240, 160, 0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 128, 128);
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+    // 文字提示牌纹理（参数化底色/边框/文字色）
+    function createTextTexture(text, bg, border, fg) {
+      const c = document.createElement("canvas");
+      c.width = 320;
+      c.height = 100;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, 320, 100);
+      ctx.strokeStyle = border;
+      ctx.lineWidth = 6;
+      ctx.strokeRect(3, 3, 314, 94);
+      ctx.fillStyle = fg;
+      ctx.font = "bold 24px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, 160, 50);
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+    // 红旗水滴纹理（红底 + 浅蓝水滴点）
+    function createDropletTexture() {
+      const c = document.createElement("canvas");
+      c.width = 128;
+      c.height = 64;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "#ef4444";
+      ctx.fillRect(0, 0, 128, 64);
+      const pts = [[20, 15, 4], [55, 30, 5], [90, 12, 3], [110, 40, 4], [35, 50, 3], [70, 45, 4], [100, 55, 3], [15, 40, 3]];
+      pts.forEach(function (p) {
+        ctx.fillStyle = "rgba(96, 165, 250, 0.9)";
+        ctx.beginPath();
+        ctx.arc(p[0], p[1], p[2], 0, Math.PI * 2);
+        ctx.fill();
+      });
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+    // 红旗冰晶纹理（红底 + 白色晶点）
+    function createFrostTexture() {
+      const c = document.createElement("canvas");
+      c.width = 128;
+      c.height = 64;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "#ef4444";
+      ctx.fillRect(0, 0, 128, 64);
+      const pts = [[20, 15], [55, 30], [90, 12], [110, 40], [35, 50], [70, 45], [100, 55], [15, 40]];
+      pts.forEach(function (p) {
+        ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+        ctx.beginPath();
+        ctx.arc(p[0], p[1], 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(p[0] - 5, p[1]);
+        ctx.lineTo(p[0] + 5, p[1]);
+        ctx.moveTo(p[0], p[1] - 5);
+        ctx.lineTo(p[0], p[1] + 5);
+        ctx.stroke();
+      });
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+    const dropletTex = createDropletTexture();
+    const frostTex = createFrostTexture();
+
+    // ==================== 偏热专属附加元素 ====================
+    // 小屋底部淡暖黄色渐变光晕
+    const glow = new THREE.Mesh(
+      new THREE.PlaneGeometry(5, 5),
+      new THREE.MeshBasicMaterial({ map: createGlowTexture(), transparent: true, depthWrite: false })
+    );
+    glow.rotation.x = -Math.PI / 2;
+    glow.position.set(0, 0.02, 0);
+    glow.visible = false;
+    scene.add(glow);
+
+    // 小型空调 / 制冷设备模型（小屋右侧）
+    const acGroup = new THREE.Group();
+    const acBody = new THREE.Mesh(
+      new THREE.BoxGeometry(0.42, 0.5, 0.22),
+      new THREE.MeshStandardMaterial({ color: 0xf1f5f9 })
+    );
+    acBody.position.y = 0.25;
+    acGroup.add(acBody);
+    const acVent = new THREE.Mesh(
+      new THREE.BoxGeometry(0.34, 0.1, 0.04),
+      new THREE.MeshStandardMaterial({ color: 0x64748b })
+    );
+    acVent.position.set(0, 0.22, 0.12);
+    acGroup.add(acVent);
+    const acLight = new THREE.Mesh(
+      new THREE.SphereGeometry(0.04, 8, 8),
+      new THREE.MeshStandardMaterial({ color: 0x22c55e })
+    );
+    acLight.position.set(0.12, 0.38, 0.12);
+    acGroup.add(acLight);
+    acGroup.position.set(1.35, 0, 0.6);
+    acGroup.visible = false;
+    scene.add(acGroup);
+
+    // 地面淡暖黄色柔和波纹热浪（半透明面片缓慢上浮淡出）
+    const heatWaves = [];
+    for (let i = 0; i < 4; i++) {
+      const wave = new THREE.Mesh(
+        new THREE.CircleGeometry(0.7, 20),
+        new THREE.MeshBasicMaterial({
+          color: 0xffe082,
+          transparent: true,
+          opacity: 0,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+        })
+      );
+      wave.rotation.x = -Math.PI / 2;
+      const baseX = (i - 1.5) * 0.9;
+      const baseZ = i % 2 === 0 ? -0.5 : 0.5;
+      wave.position.set(baseX, 0.05, baseZ);
+      wave.visible = false;
+      scene.add(wave);
+      heatWaves.push({ mesh: wave, phase: i * 0.25, baseX: baseX, baseZ: baseZ });
+    }
+
+    // 三块状态提示牌（同位置，互斥显示）
+    function makeNoticeBoard(text, bg, border, fg) {
+      const board = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.28, 0.4),
+        new THREE.MeshBasicMaterial({
+          map: createTextTexture(text, bg, border, fg),
+          transparent: true,
+          side: THREE.DoubleSide,
+        })
+      );
+      board.position.set(0, 1.0, 0.85); // 贴墙正面，门上方
+      board.visible = false;
+      scene.add(board);
+      return board;
+    }
+    const noticeBoardHot = makeNoticeBoard("温度偏高，风扇全速运行", "#fff3cd", "#f59e0b", "#b45309");
+    const noticeBoardWet = makeNoticeBoard("湿度偏高，注意防潮", "#ffffff", "#60a5fa", "#1d4ed8");
+    const noticeBoardCold = makeNoticeBoard("温度偏低，注意保暖", "#dbeafe", "#3b82f6", "#1e40af");
+
+    // ==================== 偏湿专属附加元素 ====================
+    // 蓝色水滴面片（窗边下落）
+    const drops = [];
+    const dropMat = new THREE.MeshBasicMaterial({
+      color: 0x3b82f6,
+      transparent: true,
+      opacity: 0.9,
+      side: THREE.DoubleSide,
+    });
+    for (let i = 0; i < 12; i++) {
+      const drop = new THREE.Mesh(new THREE.CircleGeometry(0.06, 10), dropMat);
+      drop.visible = false;
+      scene.add(drop);
+      drops.push({
+        mesh: drop,
+        x: (i % 2 === 0 ? -1 : 1) * (0.9 + (i % 5) * 0.25),
+        z: (i % 3) * 0.9 - 0.9,
+        speed: 0.7 + (i % 4) * 0.25,
+        phase: i * 0.4,
+      });
+    }
+
+    // 窗户下方地面浅蓝积水小点
+    const puddles = [];
+    const puddleMat = new THREE.MeshBasicMaterial({
+      color: 0x60a5fa,
+      transparent: true,
+      opacity: 0.45,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const puddleDefs = [
+      { x: -0.8, z: 1.6, r: 0.14 },
+      { x: -0.5, z: 1.9, r: 0.10 },
+      { x: -0.2, z: 1.4, r: 0.12 },
+      { x: 0.0, z: 1.75, r: 0.08 },
+      { x: -0.65, z: 2.1, r: 0.16 },
+    ];
+    puddleDefs.forEach(function (p) {
+      const puddle = new THREE.Mesh(new THREE.CircleGeometry(p.r, 16), puddleMat);
+      puddle.rotation.x = -Math.PI / 2;
+      puddle.position.set(p.x, 0.02, p.z);
+      puddle.visible = false;
+      scene.add(puddle);
+      puddles.push(puddle);
+    });
+
+    // 门口地面细碎溅起小水花（弹跳动画）
+    const splashes = [];
+    const splashMat = new THREE.MeshBasicMaterial({
+      color: 0x3b82f6,
+      transparent: true,
+      opacity: 0.8,
+      side: THREE.DoubleSide,
+    });
+    for (let i = 0; i < 6; i++) {
+      const splash = new THREE.Mesh(new THREE.CircleGeometry(0.045, 10), splashMat);
+      splash.visible = false;
+      scene.add(splash);
+      splashes.push({
+        mesh: splash,
+        x: (i % 3 - 1) * 0.35,
+        z: 0.7 + (i % 2) * 0.3,
+        phase: i * 0.35,
+      });
+    }
+
+    // ==================== 偏冷专属附加元素 ====================
+    // 白色雪花粒子
+    const snowCount = 90;
+    const snowGeom = new THREE.BufferGeometry();
+    const snowPositions = new Float32Array(snowCount * 3);
+    const snowSpeeds = new Float32Array(snowCount);
+    for (let i = 0; i < snowCount; i++) {
+      snowPositions[i * 3] = (Math.random() - 0.5) * 9;
+      snowPositions[i * 3 + 1] = Math.random() * 4;
+      snowPositions[i * 3 + 2] = (Math.random() - 0.5) * 9;
+      snowSpeeds[i] = 0.4 + Math.random() * 0.6;
+    }
+    snowGeom.setAttribute("position", new THREE.BufferAttribute(snowPositions, 3));
+    const snow = new THREE.Points(
+      snowGeom,
+      new THREE.PointsMaterial({ color: 0xffffff, size: 0.08, transparent: true, opacity: 0.95 })
+    );
+    snow.visible = false;
+    scene.add(snow);
+
+    // 屋顶边缘 + 草地边缘薄白色霜边
+    const frostGroup = new THREE.Group();
+    const frostMat = new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.7 });
+    const frostRoofFront = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.05, 0.06), frostMat);
+    frostRoofFront.position.set(0, 1.4, 0.95);
+    const frostRoofBack = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.05, 0.06), frostMat);
+    frostRoofBack.position.set(0, 1.4, -0.95);
+    const frostGroundFront = new THREE.Mesh(new THREE.BoxGeometry(14, 0.02, 0.12), frostMat);
+    frostGroundFront.position.set(0, 0.02, 6);
+    const frostGroundBack = new THREE.Mesh(new THREE.BoxGeometry(14, 0.02, 0.12), frostMat);
+    frostGroundBack.position.set(0, 0.02, -6);
+    const frostGroundLeft = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.02, 12), frostMat);
+    frostGroundLeft.position.set(-7, 0.02, 0);
+    const frostGroundRight = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.02, 12), frostMat);
+    frostGroundRight.position.set(7, 0.02, 0);
+    frostGroup.add(frostRoofFront, frostRoofBack, frostGroundFront, frostGroundBack, frostGroundLeft, frostGroundRight);
+    frostGroup.visible = false;
+    scene.add(frostGroup);
+
+    // 屋顶上方小雪花图标（六角星面片）
+    function createSnowflakeGeometry() {
+      const s = new THREE.Shape();
+      const spikes = 6;
+      const outerR = 0.28;
+      const innerR = 0.1;
+      for (let i = 0; i < spikes * 2; i++) {
+        const r = i % 2 === 0 ? outerR : innerR;
+        const a = (i / (spikes * 2)) * Math.PI * 2 - Math.PI / 2;
+        const x = Math.cos(a) * r;
+        const y = Math.sin(a) * r;
+        if (i === 0) s.moveTo(x, y);
+        else s.lineTo(x, y);
+      }
+      s.closePath();
+      return new THREE.ShapeGeometry(s);
+    }
+    const snowIcon = new THREE.Mesh(
+      createSnowflakeGeometry(),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.DoubleSide })
+    );
+    snowIcon.position.set(0, 2.7, 0);
+    snowIcon.visible = false;
+    scene.add(snowIcon);
+
+    // 花盆周边半透明薄冰面片
+    const icePatches = [];
+    const iceMat = new THREE.MeshBasicMaterial({
+      color: 0xbfe3ff,
+      transparent: true,
+      opacity: 0.5,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    [[-1.5, 1.3], [1.5, 1.3]].forEach(function (pos) {
+      const ice = new THREE.Mesh(new THREE.CircleGeometry(0.4, 20), iceMat);
+      ice.rotation.x = -Math.PI / 2;
+      ice.position.set(pos[0], 0.02, pos[1]);
+      ice.visible = false;
+      scene.add(ice);
+      icePatches.push(ice);
+    });
+
+    // ==================== 四大状态切换函数 ====================
+    let currentStatus = "正常";
+    let fanSpinning = false;
+    let grassLean = 0;        // 当前草叶倾斜度（0=直立，1=蔫掉）
+    let grassLeanTarget = 0;  // 目标倾斜度（偏热=1，其他=0）
+
+    function hideAllEffects() {
+      // 隐藏所有专属 mesh
+      glow.visible = false;
+      acGroup.visible = false;
+      heatWaves.forEach(function (w) { w.mesh.visible = false; });
+      noticeBoardHot.visible = false;
+      noticeBoardWet.visible = false;
+      noticeBoardCold.visible = false;
+      drops.forEach(function (d) { d.mesh.visible = false; });
+      puddles.forEach(function (p) { p.visible = false; });
+      splashes.forEach(function (s) { s.mesh.visible = false; });
+      grassDroplets.forEach(function (g) { g.visible = false; });
+      frostGroup.visible = false;
+      snowIcon.visible = false;
+      icePatches.forEach(function (i) { i.visible = false; });
+      snow.visible = false;
+      // 复位材质（窗户高光 / 红旗贴图）
+      windowMat.roughness = 0.7;
+      windowMat.metalness = 0;
+      flag.material.map = null;
+      flag.material.needsUpdate = true;
+      flag.material.color.set(0xef4444);
+    }
+
+    function updateScene(statusText) {
+      currentStatus = statusText;
+      hideAllEffects();
+
+      if (statusText === "偏热") {
+        fanSpinning = true;            // 三叶风扇高速旋转
+        windowMat.color.set(0xbfdbfe); // 窗户浅蓝
+        glow.visible = true;           // 光晕
+        acGroup.visible = true;        // 空调
+        heatWaves.forEach(function (w) { w.mesh.visible = true; }); // 热浪
+        noticeBoardHot.visible = true; // 黄底提示牌
+        grassLeanTarget = 1;           // 小草蔫掉
+      } else if (statusText === "偏湿") {
+        fanSpinning = false;           // 风扇静止
+        windowMat.color.set(0x1e3a8a); // 窗户深蓝
+        windowMat.roughness = 0.15;    // 湿润水光高光
+        windowMat.metalness = 0.25;
+        drops.forEach(function (d) { d.mesh.visible = true; }); // 水滴
+        puddles.forEach(function (p) { p.visible = true; });    // 积水点
+        splashes.forEach(function (s) { s.mesh.visible = true; }); // 溅水花
+        grassDroplets.forEach(function (g) { g.visible = true; }); // 草叶水珠
+        noticeBoardWet.visible = true; // 白底提示牌
+        flag.material.map = dropletTex;    // 红旗水滴纹理
+        flag.material.color.set(0xffffff);
+        flag.material.needsUpdate = true;
+        grassLeanTarget = 0;
+      } else if (statusText === "偏冷") {
+        fanSpinning = false;           // 风扇静止
+        windowMat.color.set(0xe0f7fa); // 窗户冰青白浅蓝
+        snow.visible = true;           // 雪花
+        frostGroup.visible = true;     // 霜边
+        snowIcon.visible = true;       // 雪花图标
+        icePatches.forEach(function (i) { i.visible = true; }); // 薄冰
+        noticeBoardCold.visible = true; // 蓝底提示牌
+        flag.material.map = frostTex;    // 红旗冰晶纹理
+        flag.material.color.set(0xffffff);
+        flag.material.needsUpdate = true;
+        grassLeanTarget = 0;
+      } else {
+        // 正常 / 其他兜底：静止 + 浅蓝，无特效
+        fanSpinning = false;
+        windowMat.color.set(0xbfdbfe);
+        grassLeanTarget = 0;
+      }
+    }
+    // 显式挂到 window，保证控制台可直接测试
+    window.updateScene = updateScene;
+
+    const effectStartTime = performance.now();
+
+    // ==================== 动画循环 ====================
+    // 偏热——热浪上浮
+    function updateHeatWaves(time) {
+      heatWaves.forEach(function (w) {
+        const t = (time * 0.5 + w.phase) % 1;
+        w.mesh.position.y = 0.05 + t * 1.2;
+        w.mesh.position.x = w.baseX + Math.sin(time * 2 + w.phase) * 0.15;
+        w.mesh.material.opacity = Math.max(0, 0.35 * (1 - t));
+      });
+    }
+
+    // 偏湿——水滴下落
+    function updateDrops(time) {
+      drops.forEach(function (d) {
+        const y = 3.2 - ((time * d.speed + d.phase) % 3.1);
+        d.mesh.position.set(d.x, y, d.z);
+      });
+    }
+
+    // 偏湿——门口溅水花弹跳
+    function updateSplashes(time) {
+      splashes.forEach(function (sp) {
+        const t = (time * 1.2 + sp.phase) % 1;
+        sp.mesh.position.set(sp.x, 0.05 + Math.abs(Math.sin(t * Math.PI)) * 0.5, sp.z);
+        sp.mesh.material.opacity = 0.8 * (1 - t);
+      });
+    }
+
+    // 偏冷——雪花飘落
+    function updateSnow(time) {
+      const pos = snow.geometry.attributes.position.array;
+      for (let i = 0; i < snowCount; i++) {
+        let x = pos[i * 3];
+        let y = pos[i * 3 + 1] - 0.02 * snowSpeeds[i];
+        let z = pos[i * 3 + 2];
+        x += Math.sin(time * 2 + i) * 0.008;
+        if (y < 0) {
+          y = 3.8;
+          x = (Math.random() - 0.5) * 9;
+          z = (Math.random() - 0.5) * 9;
+        }
+        pos[i * 3] = x;
+        pos[i * 3 + 1] = y;
+        pos[i * 3 + 2] = z;
+      }
+      snow.geometry.attributes.position.needsUpdate = true;
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const time = (performance.now() - effectStartTime) / 1000;
+
+      // 三叶风扇：仅偏热高速旋转
+      if (fanSpinning) fanBlades.rotation.z += 0.35;
+
+      // 小旗子：偏热摆动加快，其余缓慢飘动
+      if (currentStatus === "偏热") {
+        flagPivot.rotation.y = Math.sin(time * 6) * 0.5;
+      } else {
+        flagPivot.rotation.y = Math.sin(time * 1.5) * 0.15;
+      }
+
+      // 小草：偏热微蔫，其余直立（平滑过渡）
+      grassLean += (grassLeanTarget - grassLean) * 0.06;
+      allGrass.forEach(function (g) {
+        g.pivot.rotation.x = grassLean * 0.8 * Math.cos(g.angle);
+        g.pivot.rotation.z = grassLean * 0.8 * Math.sin(g.angle);
+      });
+
+      // 各状态专属特效
+      if (currentStatus === "偏热") {
+        updateHeatWaves(time);
+      } else if (currentStatus === "偏湿") {
+        updateDrops(time);
+        updateSplashes(time);
+      } else if (currentStatus === "偏冷") {
+        updateSnow(time);
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    // 窗口缩放自适应
+    window.addEventListener("resize", function () {
+      const w = dorm3d.clientWidth;
+      const h = dorm3d.clientHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    });
+
+    // 启动：默认正常态
+    updateScene("正常");
+    animate();
+
+    // ==================== MQTT 连接（WebSocket） ====================
+    const client = mqtt.connect("ws://127.0.0.1:9001", {
+      reconnectPeriod: 4000,
+      clientId: "dormmate-3d-" + Math.random().toString(16).slice(2),
+    });
+
+    client.on("connect", function () {
+      setStatus("已连接", "connected");
+      clearNotice();
+      client.subscribe("dormmate/+/env");
+    });
+
+    client.on("reconnect", function () { setStatus("重连中…", "reconnecting"); });
+    client.on("close", function () { setStatus("断开", "disconnected"); });
+    client.on("offline", function () { setStatus("断开", "disconnected"); });
+    client.on("error", function () {
+      setStatus("连接失败", "error");
+      setNotice("MQTT 连接出错，稍后自动重连");
+    });
+
+    // —— 消息处理（含容错）——
+    client.on("message", function (topic, payload) {
+      const parts = topic.split("/");
+      const nodeId = parts[1];
+
+      if (NODE_IDS.indexOf(nodeId) === -1) {
+        setNotice("收到未知节点或错误 topic：" + topic);
+        return;
+      }
+
+      let msg;
+      try {
+        msg = JSON.parse(payload.toString());
+      } catch (e) {
+        setNotice("收到非法 JSON 消息，已忽略");
+        return;
+      }
+
+      const temperature = Number(msg.temperature);
+      const humidity = Number(msg.humidity);
+      if (Number.isNaN(temperature) || Number.isNaN(humidity)) {
+        setNotice("消息字段非法，已忽略");
+        return;
+      }
+
+      const status = getStatus(temperature, humidity);
+
+      // 更新当前状态文字，并驱动 3D 场景
+      curStatusEl.textContent = status + "（" + nodeId + "）";
+      curStatusEl.className = statusClass(status);
+      updateScene(status);
+    });
+  </script>
+</body>
+</html>
