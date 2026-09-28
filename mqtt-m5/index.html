@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DormMate M5 · MQTT 监控面板</title>
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- mqtt.js：浏览器全局 mqtt -->
+  <script src="https://cdn.jsdelivr.net/npm/mqtt@4.3.7/dist/mqtt.min.js"></script>
+  <!-- Chart.js：绘图库，浏览器全局 Chart -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <main class="card">
+    <h1 class="title">DormMate M5 · MQTT 监控面板</h1>
+    <p class="subtitle">ws://127.0.0.1:9001 · 订阅 dormmate/+/env</p>
+
+    <!-- 连接状态 -->
+    <div class="status-bar">
+      <span id="statusDot" class="dot"></span>
+      <span id="statusText">未连接</span>
+      <span id="notice" class="notice"></span>
+    </div>
+
+    <!-- 3 张节点卡片：dorm-a / dorm-b / dorm-c -->
+    <section class="nodes-grid">
+      <div class="node-card" data-node="dorm-a">
+        <h3 class="node-id">dorm-a</h3>
+        <p class="node-metric">温度：<span class="node-temp">--</span> ℃</p>
+        <p class="node-metric">湿度：<span class="node-humid">--</span> %</p>
+        <p class="node-status">--</p>
+      </div>
+
+      <div class="node-card" data-node="dorm-b">
+        <h3 class="node-id">dorm-b</h3>
+        <p class="node-metric">温度：<span class="node-temp">--</span> ℃</p>
+        <p class="node-metric">湿度：<span class="node-humid">--</span> %</p>
+        <p class="node-status">--</p>
+      </div>
+
+      <div class="node-card" data-node="dorm-c">
+        <h3 class="node-id">dorm-c</h3>
+        <p class="node-metric">温度：<span class="node-temp">--</span> ℃</p>
+        <p class="node-metric">湿度：<span class="node-humid">--</span> %</p>
+        <p class="node-status">--</p>
+      </div>
+    </section>
+
+    <!-- 图表区：节点切换 + 温湿度双折线 -->
+    <section class="chart-section">
+      <div class="chart-header">
+        <h2 class="section-title">温湿度趋势</h2>
+        <select id="nodeSelect" class="node-select">
+          <option value="dorm-a">dorm-a</option>
+          <option value="dorm-b">dorm-b</option>
+          <option value="dorm-c">dorm-c</option>
+        </select>
+      </div>
+      <div class="chart-box">
+        <canvas id="trendChart"></canvas>
+      </div>
+    </section>
+
+    <!-- 全局历史记录：全部保留，不限制条数 -->
+    <section class="history-section">
+      <h2 class="section-title">历史记录</h2>
+      <ul id="historyList" class="history-list"></ul>
+      <p id="historyEmpty" class="history-empty">暂无消息</p>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

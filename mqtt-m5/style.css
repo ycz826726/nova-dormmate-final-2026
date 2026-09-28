@@ -1,0 +1,202 @@
+/* ==================== DormMate C01 M5 · MQTT 监控面板样式（复用 M1 风格） ==================== */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", sans-serif;
+  background: #eef2f7;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+  padding: 24px;
+}
+
+/* 卡片：圆角 + 阴影，页面居中（复用 M1 的 card 风格） */
+.card {
+  width: 100%;
+  max-width: 1000px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  padding: 28px;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 4px 0 20px;
+}
+
+/* 连接状态栏：圆点 + 文案 + 错误提示 */
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  margin-bottom: 20px;
+  font-size: 14px;
+  color: #374151;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #9ca3af; /* 默认灰 = 未连接 */
+  flex-shrink: 0;
+}
+.dot.connected    { background: #16a34a; } /* 绿 */
+.dot.reconnecting { background: #d97706; } /* 黄 */
+.dot.disconnected,
+.dot.error        { background: #dc2626; } /* 红 */
+
+.notice {
+  margin-left: auto;
+  font-size: 13px;
+  color: #dc2626;
+}
+
+/* 三节点卡片：三列网格 */
+.nodes-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.node-card {
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #f9fafb;
+}
+
+.node-id {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 10px;
+}
+
+.node-metric {
+  font-size: 14px;
+  color: #4b5563;
+  margin-bottom: 6px;
+}
+
+.node-temp,
+.node-humid {
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.node-status {
+  font-size: 15px;
+  font-weight: 700;
+  margin-top: 6px;
+}
+
+/* 状态颜色标识：正常绿 / 偏热橙 / 偏湿蓝 / 偏冷青 */
+.status-normal { color: #16a34a; }
+.status-hot    { color: #f59e0b; }
+.status-wet    { color: #2563eb; }
+.status-cold   { color: #06b6d4; }
+
+/* 图表区 */
+.chart-section {
+  margin-bottom: 20px;
+}
+
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.section-title {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.node-select {
+  padding: 6px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  background: #fff;
+  color: #374151;
+}
+
+/* 图表容器固定高度，配合 Chart.js maintainAspectRatio:false */
+.chart-box {
+  position: relative;
+  height: 320px;
+}
+
+/* 历史记录区：全部保留，固定高度滚动查看 */
+.history-section {
+  margin-top: 20px;
+}
+
+.history-list {
+  list-style: none;
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 8px;
+  background: #f9fafb;
+}
+
+.history-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #fff;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #374151;
+}
+
+.history-time {
+  color: #9ca3af;
+}
+
+.history-node {
+  color: #4f7cff;
+  background: #f5f8ff;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.history-status {
+  font-weight: 700;
+}
+
+.history-empty {
+  font-size: 13px;
+  color: #9ca3af;
+  padding: 8px;
+}
